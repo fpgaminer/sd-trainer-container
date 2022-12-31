@@ -209,7 +209,8 @@ def main(args, config=None):
 				
 				if epoch_samples >= config.samples_per_epoch:
 					epoch_samples = 0
-					validation_dataloader = torch.utils.data.DataLoader(validation_dataset, batch_size=batch_size, shuffle=False, num_workers=4, collate_fn=validation_dataset.collate_fn)
+					# Note I'm using batch_size=1 here, because there was some reproducibility issue with batch_size > 1 (I think...)
+					validation_dataloader = torch.utils.data.DataLoader(validation_dataset, batch_size=1, shuffle=False, num_workers=4, collate_fn=validation_dataset.collate_fn)
 					validation_loss = 0
 					validation_steps = 0
 

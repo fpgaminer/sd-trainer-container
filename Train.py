@@ -33,6 +33,7 @@ parser.add_argument('--device', type=str, default="cuda:1", help='Device to use'
 parser.add_argument('--device_batch_size', type=int, default=1, help='Device batch size')
 parser.add_argument('--batch_size', type=int, default=1, help='Actual batch size; gradient accumulation is used on device_batch_size to achieve this')
 parser.add_argument('--wandb_sweep', type=str, default=None, help='Wandb sweep id')
+parser.add_argument('--wandb_project', type=str, default=None, help='Wandb project')
 parser.add_argument('--dataset', type=str, help='Dataset to use')
 parser.add_argument('--only_subreddit', type=bool_arg, default=False, help='Only use the subreddit in the prompt, and ignore similarity score')
 parser.add_argument('--lr', type=float, default=1e-6, help='Learning rate')
@@ -58,7 +59,7 @@ def main():
 	save_image_prompts = [s.strip() for s in args.save_image_prompts.split("|")]
 
 	def runner(args, config):
-		with wandb.init(config=config):
+		with wandb.init(config=config, project=args.wandb_project):
 			trainer = MainTrainer(
 				config=wandb.config,
 				output_dir=args.output_dir,

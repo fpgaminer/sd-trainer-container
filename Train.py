@@ -206,9 +206,9 @@ class MainTrainer:
 		# Calculate the batch size and gradient accumulation steps to get the target batch size
 		self.device_batch_size = min(self.batch_size, device_batch_size)
 		self.gradient_accumulation_steps = self.batch_size // self.device_batch_size
-		self.test_every = test_every // self.batch_size
-		self.save_every = save_every // self.batch_size
-		self.save_images_every = save_images_every // self.batch_size
+		self.test_every = int(math.ceil(test_every / self.batch_size))
+		self.save_every = int(math.ceil(save_every / self.batch_size))
+		self.save_images_every = int(math.ceil(save_images_every / self.batch_size))
 
 		assert self.batch_size == self.device_batch_size * self.gradient_accumulation_steps, f"batch_size {self.batch_size} must be divisible by device_batch_size {device_batch_size}"
 	
@@ -369,7 +369,7 @@ class MainTrainer:
 				loss_sum = 0
 
 				# Save checkpoint
-				if (self.global_step + 1) % self.save_every == 0 or (self.global_step + 1) == self.total_steps:
+				if self.save_every > 0 and ((self.global_step + 1) % self.save_every == 0 or (self.global_step + 1) == self.total_steps):
 					self.save_checkpoint()
 				
 				# Validation

@@ -23,7 +23,7 @@ RUN pip install -U \
 	diffusers==0.11.1 \
 	wandb==0.13.7 \
 	datasets==2.8.0 \
-	bitsandbytes==0.36.0 \
+	bitsandbytes==0.36.0.post2 \
 	accelerate==0.15.0
 
 COPY Train.py /

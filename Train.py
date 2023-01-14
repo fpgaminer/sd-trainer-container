@@ -26,6 +26,7 @@ import math
 import gc
 from typing import Optional
 import sys
+import json
 
 
 SAMPLERS = {
@@ -137,6 +138,7 @@ class FinetuneDataset(Dataset):
 		self.device = device
 		self.only_subreddit = only_subreddit
 		self.is_validation = is_validation
+		self.clip_penultimate = False
 
 		# We apply 10% dropout to the text conditioning.
 		# To implement this in a reproducible way, we take a simple approach and deterministically generate a bitmask.
@@ -187,15 +189,7 @@ class FinetuneDataset(Dataset):
 		for i, x in enumerate(input_ids):
 			for j, y in enumerate(x):
 				input_ids[i][j] = [self.tokenizer.bos_token_id, *y, *np.full((self.tokenizer.model_max_length - len(y) - 1), self.tokenizer.eos_token_id)]
-
-		#if clip_penultimate:
-		#	input_ids = [self.text_encoder.text_model.final_layer_norm(self.text_encoder(torch.asarray(input_id).to(self.device), output_hidden_states=True)['hidden_states'][-2])[0] for input_id in input_ids]
-		#else:
-		#	input_ids = [self.text_encoder(torch.asarray(input_id).to(self.device), output_hidden_states=True).last_hidden_state[0] for input_id in input_ids]
-
-		#input_ids = torch.cat(prompt_ids, dim=0)
-		#input_ids = torch.stack(tuple(input_ids))
-
+		
 		return {
 			'latents': latents,
 			'input_ids': input_ids,
@@ -250,7 +244,7 @@ class MainTrainer:
 
 		if self.allow_tf32:
 			torch.backends.cuda.matmul.allow_tf32 = True
-		
+
 		# Calculate the batch size and gradient accumulation steps to get the target batch size
 		self.device_batch_size = min(self.batch_size, device_batch_size)
 		self.gradient_accumulation_steps = self.batch_size // (self.device_batch_size * self.world_size)
@@ -405,7 +399,7 @@ class MainTrainer:
 			except StopIteration:
 				self.train_sampler.set_epoch(self.train_sampler.epoch + 1) # This is important to ensure the data is re-shuffled after every use
 				self.dataloader_iter = iter(self.dataloader)
-				batch = next(self.dataloader)
+				batch = next(self.dataloader_iter)
 			
 			latents = batch["latents"].to(self.device, dtype=self.weight_dtype) # Should dtype be used here? I don't see harm in having the latent stay at 32-bit precision
 
@@ -486,6 +480,8 @@ class MainTrainer:
 
 		if self.rank == 0:
 			print(f"Saving model checkpoint to {path}")
+		
+		path.mkdir(parents=True, exist_ok=True)
 
 		# Only save the model, optimizer, and lr_scheduler on rank 0
 		if self.rank == 0:
@@ -546,7 +542,9 @@ class MainTrainer:
 
 		# Set seed for validation consistency
 		old_torch_rng_state = torch.get_rng_state()
+		old_torch_cuda_rng_state = torch.cuda.get_rng_state()
 		torch.manual_seed(42)
+		torch.cuda.manual_seed(42)
 
 		with torch.no_grad():
 			for batch in validation_dataloader:
@@ -572,6 +570,7 @@ class MainTrainer:
 		
 		# Restore PyTorch RNG state
 		torch.set_rng_state(old_torch_rng_state)
+		torch.cuda.set_rng_state(old_torch_cuda_rng_state)
 
 		validation_loss /= validation_steps
 		logs = {
